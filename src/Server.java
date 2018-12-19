@@ -3,6 +3,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -45,21 +46,32 @@ class ClientHandler implements Runnable {
     @Override
     public void run() {
         try {
+            // for reading and writing from/to socket
             OutputStream out = client.getOutputStream();
             InputStream in = client.getInputStream();
-            byte[] buffer = new byte[2048];
-            String[] messages = {"salam", "khubam!", "salamati!"};
-            for (String msg : messages) {
+
+
+            while(true) {
+                byte[] buffer = new byte[2048];
                 int read = in.read(buffer);
-                System.out.println("RECV: " + new String(buffer, 0, read));
-                out.write(msg.getBytes());
-                System.out.println("SENT: " + msg);
-                Thread.sleep(2000);
+
+                String input = new String(buffer, 0, read);
+
+                //check for closing connection
+                if(input.equals("end"))
+                    break;
+
+                //process string and measure time of execution
+
+                Result res = processExpression(input);
+
+                if(res.isValidity()){
+
+
+                }
             }
-            System.out.print("All messages sent.\nClosing client ... ");
+            System.out.print("Closing client ... ");
         } catch (IOException e) {
-            e.printStackTrace();
-        } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
             try {
@@ -70,10 +82,184 @@ class ClientHandler implements Runnable {
         }
     }
 
-    private double processExpression(String inputReq){
-        double res = 0.0;
+    private Result processExpression(String inputReq){
+        Result result = new Result(0, true, 0.0);
+        parseInputString(inputReq, result);
+        if(!result.isValidity())
+            return result;
 
-        return  res;
+        long startTime = System.nanoTime();
+
+        long endTime = System.nanoTime();
+        long timeElapsed = (endTime - startTime) / 1000000; //for converting into milliseconds
+        result.setElapsedTime(timeElapsed);
+        return result;
+    }
+
+    /**
+     * this function will parse entered string and extract op1 and op2 and operator
+     * @param inp is entered string
+     * @return true if expression is valid
+     */
+    private boolean parseInputString(String inp, Result result){
+        ArrayList<Integer> dollarIndex = new ArrayList<Integer>();
+
+        //remove all spaces from entered string
+        inp = inp.replaceAll("\\s+","");
+
+        //find all index of "$"
+        int index = inp.indexOf('$');
+        while (index >= 0) {
+            dollarIndex.add(index);
+            index = inp.indexOf('$', index + 1);
+        }
+
+        //this means it has incorrect format
+        if(dollarIndex.size() != 3 || dollarIndex.size() != 4) {
+            result.setValidity(false);
+            return false;
+        }
+
+        String operator = inp.substring(dollarIndex.get(0), dollarIndex.get(1) - 1);
+        operator = operator.toUpperCase();
+        if(!validateOperator(operator)) {
+            result.setValidity(false);
+            return false;
+        }
+
+        Double op1 = getOperand(dollarIndex.get(1), dollarIndex.get(2), inp);
+        if(op1 == null) {
+            result.setValidity(false);
+            return false;
+        }
+
+        Double op2 = null;
+        if(dollarIndex.size() == 4){
+            op2 = getOperand(dollarIndex.get(2), dollarIndex.get(3), inp);
+            if(op2 == null) {
+                result.setValidity(false);
+                return false;
+            }
+        }
+
+        result.setOperator(operator);
+        result.setOp1(op1);
+        result.setOp2(op2);
+        return true;
+    }
+
+    /**
+     * this function extract operand and convert it to double
+     * @return
+     */
+    private Double getOperand(int startIndex, int endIndex, String inp){
+        Double res = null;
+        try {
+            res = Double.parseDouble(inp.substring(startIndex, endIndex - 1));
+        }
+        catch (NumberFormatException E){
+            return null;
+        }
+        return res;
+    }
+
+    /**
+     * this function check operator in which support or not
+     * @param inp
+     * @return
+     */
+    private boolean validateOperator(String inp){
+        if(inp.equals("ADD") || inp.equals("SUBTRACT") || inp.equals("DIVIDE") || inp.equals("MULTIPLY") ||
+                inp.equals("SIN") || inp.equals("COS") || inp.equals("TAN") || inp.equals("COT"))
+            return true;
+        return false;
+    }
+
+    private boolean calculate(Result result){
+
+        if(result.getOperator().equals("ADD")){
+            result.setValue(result.getOp1() + result.getOp2());
+        }
+        else if(result.getOperator().equals("SUBTRACT")){
+            result.setValue(result.getOp1() - result.getOp2());
+        }
+        else if(result.getOperator().equals("DIVIDE")){
+            if(result.getOp2() == 0){
+                result.setValidity(false);
+                return false;
+            }
+            result.setValue(result.getOp1() / result.getOp2());
+        }
+        else if(result.getOperator() == "MULTIPLY"){
+            result.setValue(result.getOp1() * result.getOp2());
+        }
+        else if(result.getOperator() == "Sin"){
+            result.setValue(Math.sin(result.getOp1()));
+        }
+        return true;
     }
 }
 
+class Result{
+    private double value;
+    private boolean validity;
+    private double elapsedTime;
+    private Double op1;
+    private Double op2;
+    private String operator;
+
+    public Result(double v, boolean b, double e){
+        this.value = v;
+        this.validity = b;
+        this.elapsedTime = e;
+    }
+
+    public void setValue(double value) {
+        this.value = value;
+    }
+
+    public void setValidity(boolean validity) {
+        this.validity = validity;
+    }
+
+    public double getValue() {
+        return value;
+    }
+
+    public boolean isValidity() {
+        return validity;
+    }
+
+    public double getElapsedTime() {
+        return elapsedTime;
+    }
+
+    public void setElapsedTime(double elapsedTime) {
+        this.elapsedTime = elapsedTime;
+    }
+
+    public Double getOp1() {
+        return op1;
+    }
+
+    public void setOp1(Double op1) {
+        this.op1 = op1;
+    }
+
+    public Double getOp2() {
+        return op2;
+    }
+
+    public void setOp2(Double op2) {
+        this.op2 = op2;
+    }
+
+    public String getOperator() {
+        return operator;
+    }
+
+    public void setOperator(String operator) {
+        this.operator = operator;
+    }
+
+}
