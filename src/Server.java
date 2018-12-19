@@ -54,20 +54,21 @@ class ClientHandler implements Runnable {
             while(true) {
                 byte[] buffer = new byte[2048];
                 int read = in.read(buffer);
-
                 String input = new String(buffer, 0, read);
 
                 //check for closing connection
                 if(input.equals("end"))
                     break;
 
-                //process string and measure time of execution
-
+                //process string execution
                 Result res = processExpression(input);
-
+                String resultMessage;
                 if(res.isValidity()){
-
-
+                    resultMessage = "$ calculation time : " + res.getElapsedTime() + "$ result : " + res.getValue() + "$";
+                    out.write(resultMessage.getBytes());
+                }else{
+                    resultMessage = "Something wrong, please try again or end session";
+                    out.write(resultMessage.getBytes());
                 }
             }
             System.out.print("Closing client ... ");
@@ -89,7 +90,8 @@ class ClientHandler implements Runnable {
             return result;
 
         long startTime = System.nanoTime();
-
+        if(!calculate(result))
+            return result;
         long endTime = System.nanoTime();
         long timeElapsed = (endTime - startTime) / 1000000; //for converting into milliseconds
         result.setElapsedTime(timeElapsed);
@@ -175,13 +177,20 @@ class ClientHandler implements Runnable {
         return false;
     }
 
+    /**
+     * in this function we try to calculate
+     * @param result
+     * @return
+     */
     private boolean calculate(Result result){
 
         if(result.getOperator().equals("ADD")){
             result.setValue(result.getOp1() + result.getOp2());
+            return true;
         }
         else if(result.getOperator().equals("SUBTRACT")){
             result.setValue(result.getOp1() - result.getOp2());
+            return true;
         }
         else if(result.getOperator().equals("DIVIDE")){
             if(result.getOp2() == 0){
@@ -189,14 +198,41 @@ class ClientHandler implements Runnable {
                 return false;
             }
             result.setValue(result.getOp1() / result.getOp2());
+            return true;
         }
         else if(result.getOperator() == "MULTIPLY"){
             result.setValue(result.getOp1() * result.getOp2());
+            return true;
         }
-        else if(result.getOperator() == "Sin"){
+        else if(result.getOperator() == "SIN"){
             result.setValue(Math.sin(result.getOp1()));
+            return true;
         }
-        return true;
+        else if(result.getOperator() == "COS"){
+            result.setValue(Math.cos(result.getOp1()));
+            return true;
+        }
+        else if(result.getOperator() == "TAN"){
+            if(result.getOp1() != 90){
+                result.setValue(Math.tan(result.getOp1()));
+                return true;
+            }
+            else{
+                result.setValidity(false);
+                return false;
+            }
+        }
+        else if(result.getOperator() == "COT"){
+            if(result.getOp1() != 0){
+                result.setValue(Math.tan(result.getOp1()));
+                return true;
+            }
+            else{
+                result.setValidity(false);
+                return false;
+            }
+        }
+        return false;
     }
 }
 
