@@ -20,7 +20,7 @@ public class Server {
             while (acceptedClient <= serviceLimit) {
                 Socket client = server.accept();
                 System.out.println("client" + acceptedClient + " accepted!");
-                pool.execute(new ClientHandler(client, acceptedClient));
+                pool.execute(new ClientHandler(client));
                 acceptedClient++;
             }
             pool.shutdown();
@@ -36,11 +36,9 @@ public class Server {
 class ClientHandler implements Runnable {
 
     private Socket client;
-    private int clientID;
 
-    public ClientHandler(Socket client, int clientID) {
+    public ClientHandler(Socket client) {
         this.client = client;
-        this.clientID = clientID;
     }
 
     @Override
