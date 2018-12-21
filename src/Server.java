@@ -8,12 +8,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Server {
+    static int serviceLimit = 10;
+    static int acceptedClient = 1;
 
     public static void main(String[] args) {
 
         ExecutorService pool = Executors.newCachedThreadPool();
-        int serviceLimit = 10;
-        int acceptedClient = 1;
 
         try (ServerSocket server = new ServerSocket(7654)) {
             System.out.print("Server started.\nWaiting for a client ... ");
@@ -53,23 +53,29 @@ class ClientHandler implements Runnable {
                 byte[] buffer = new byte[2048];
                 int read = in.read(buffer);
                 String input = new String(buffer, 0, read);
+                String resultMessage;
 
                 //check for closing connection
-                if(input.equals("end"))
+                if(input.equals("end")) {
+                    resultMessage = "connection closed by client...";
+                    out.write(resultMessage.getBytes());
                     break;
+                }
 
                 //process string execution
                 Result res = processExpression(input);
-                String resultMessage;
+
                 if(res.isValidity()){
-                    resultMessage = "$ calculation time : " + res.getElapsedTime() + "$ result : " + res.getValue() + "$";
+                    resultMessage = "$ calculation time(ns) : " + res.getElapsedTime() + "$ result : " + res.getValue() + "$";
                     out.write(resultMessage.getBytes());
                 }else{
                     resultMessage = "Something wrong, please try again or end session";
                     out.write(resultMessage.getBytes());
                 }
             }
-            System.out.print("Closing client ... ");
+            System.out.println("Closing client ... ");
+            Server.serviceLimit ++;
+
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -91,7 +97,7 @@ class ClientHandler implements Runnable {
         if(!calculate(result))
             return result;
         long endTime = System.nanoTime();
-        long timeElapsed = (endTime - startTime) / 1000000; //for converting into milliseconds
+        long timeElapsed = (endTime - startTime); //for converting into milliseconds
         result.setElapsedTime(timeElapsed);
         return result;
     }
@@ -115,12 +121,12 @@ class ClientHandler implements Runnable {
         }
 
         //this means it has incorrect format
-        if(dollarIndex.size() != 3 || dollarIndex.size() != 4) {
+        if(!(dollarIndex.size() == 3 || dollarIndex.size() == 4)) {
             result.setValidity(false);
             return false;
         }
 
-        String operator = inp.substring(dollarIndex.get(0), dollarIndex.get(1) - 1);
+        String operator = inp.substring(dollarIndex.get(0) + 1, dollarIndex.get(1));
         operator = operator.toUpperCase();
         if(!validateOperator(operator)) {
             result.setValidity(false);
@@ -155,7 +161,7 @@ class ClientHandler implements Runnable {
     private Double getOperand(int startIndex, int endIndex, String inp){
         Double res = null;
         try {
-            res = Double.parseDouble(inp.substring(startIndex, endIndex - 1));
+            res = Double.parseDouble(inp.substring(startIndex + 1, endIndex));
         }
         catch (NumberFormatException E){
             return null;
@@ -198,20 +204,23 @@ class ClientHandler implements Runnable {
             result.setValue(result.getOp1() / result.getOp2());
             return true;
         }
-        else if(result.getOperator() == "MULTIPLY"){
+        else if(result.getOperator().equals("MULTIPLY")){
             result.setValue(result.getOp1() * result.getOp2());
             return true;
         }
-        else if(result.getOperator() == "SIN"){
+        else if(result.getOperator().equals("SIN")){
+            result.setOp1(Math.toRadians(result.getOp1()));
             result.setValue(Math.sin(result.getOp1()));
             return true;
         }
-        else if(result.getOperator() == "COS"){
+        else if(result.getOperator().equals("COS")){
+            result.setOp1(Math.toRadians(result.getOp1()));
             result.setValue(Math.cos(result.getOp1()));
             return true;
         }
-        else if(result.getOperator() == "TAN"){
-            if(result.getOp1() != 90){
+        else if(result.getOperator().equals("TAN")){
+            result.setOp1(Math.toRadians(result.getOp1()));
+            if(result.getOp1() != Math.toRadians(90)){
                 result.setValue(Math.tan(result.getOp1()));
                 return true;
             }
@@ -220,9 +229,10 @@ class ClientHandler implements Runnable {
                 return false;
             }
         }
-        else if(result.getOperator() == "COT"){
+        else if(result.getOperator().equals("COT")){
+            result.setOp1(Math.toRadians(result.getOp1()));
             if(result.getOp1() != 0){
-                result.setValue(Math.tan(result.getOp1()));
+                result.setValue(1.0/Math.tan(result.getOp1()));
                 return true;
             }
             else{
